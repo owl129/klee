@@ -1013,19 +1013,18 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         if (blockname == (*replayPartialPath)[current.partialPathPosition].blockName ){                                                                
           bool branch = (*replayPartialPath)[current.partialPathPosition].branch;                                                                      
           // enable for debug                                                                                                                          
-          //llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";               
-          llvm::outs() << "\tnum:"<< current.partialPathPosition << "\tprocess: "<< current.partialPathPosition*100 /replayPartialPath->size() <<"%\n";
+          // llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";
+          // progress tips
+          // llvm::outs() << "\tnum:"<< current.partialPathPosition << "\tprocess: "<< current.partialPathPosition*100 /(replayPartialPath->size()-1) <<"%\n";
                                                                                                                                                        
           if (res==Solver::True) {                                                                                                                     
             if (!branch){
-              llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";
-              terminateStateEarly(current, "hit invalid branch in replay path mode");                                                                
+              terminateState(current); // terminated without testcase generated
               return StatePair(0, 0);                                                                                                                  
             }                                                                                                                                          
           } else if (res==Solver::False) {                                                                                                             
             if (branch){                                                                                                                               
-              llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";
-              terminateStateEarly(current, "hit invalid branch in replay path mode");                                                                  
+              terminateState(current);                                                                  
               return StatePair(0, 0);                                                                                                                  
             }                                                                                                                                          
           } else {                                                                                                                                     
@@ -3181,8 +3180,7 @@ void Executor::terminateStateEarly(ExecutionState &state,
   llvm::outs() << "current position:\t" << state.partialPathPosition << "\ttotal:\t" << replayPartialPath->size() <<"\n";
   if (!OnlyOutputStatesCoveringNew || state.coveredNew ||
       (AlwaysOutputSeeds && seedMap.count(&state)))
-    if ((replayPartialPath==NULL) || (replayPartialPath!=NULL && state.partialPathPosition == replayPartialPath->size()))
-      interpreterHandler->processTestCase(state, (message + "\n").str().c_str(),
+    interpreterHandler->processTestCase(state, (message + "\n").str().c_str(),
                                         "early");
   terminateState(state);
 }
@@ -3190,7 +3188,8 @@ void Executor::terminateStateEarly(ExecutionState &state,
 void Executor::terminateStateOnExit(ExecutionState &state) {
   if (!OnlyOutputStatesCoveringNew || state.coveredNew || 
       (AlwaysOutputSeeds && seedMap.count(&state)))
-    interpreterHandler->processTestCase(state, 0, 0);
+    if (!replayPartialPath || (replayPartialPath && state.partialPathPosition == replayPartialPath->size()) )
+      interpreterHandler->processTestCase(state, 0, 0);
   terminateState(state);
 }
 
