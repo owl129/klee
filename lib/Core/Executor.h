@@ -191,6 +191,7 @@ private:
 
   /// When non-null a list of branch decisions to be used for replay.
   const std::vector<bool> *replayPath;
+  const std::vector<PathLocation> *replayPartialPath;
 
   /// The index into the current \ref replayKTest or \ref replayPath
   /// object.
@@ -477,6 +478,7 @@ private:
   void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
   void doDumpStates();
+  std::string getPathInfo(const ExecutionState &state, bool trueBranch);
 
 public:
   Executor(llvm::LLVMContext &ctx, const InterpreterOptions &opts,
@@ -504,6 +506,11 @@ public:
     replayPath = path;
     replayPosition = 0;
   }
+  virtual void setReplayPartialPath(const std::vector<PathLocation> *path) {  
+    assert(!replayKTest && "cannot replay both buffer and path");             
+    replayPartialPath = path;                                                 
+    replayPosition = 0;                                                       
+  }                                                                           
 
   llvm::Module *setModule(std::vector<std::unique_ptr<llvm::Module>> &modules,
                           const ModuleOptions &opts) override;

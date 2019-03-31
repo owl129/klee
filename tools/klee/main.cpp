@@ -255,6 +255,10 @@ namespace {
                  cl::desc("Specify a path file to replay"),
                  cl::value_desc("path file"),
                  cl::cat(ReplayCat));
+  cl::opt<std::string>                                                  
+  ReplayPartialPathFile("replay-partial-path",                          
+                 cl::desc("Specify a partial path file to replay"),     
+                 cl::value_desc("path file"));                          
 
 
 
@@ -341,6 +345,8 @@ public:
   // load a .path file
   static void loadPathFile(std::string name,
                            std::vector<bool> &buffer);
+  static void loadPartialPathFile(std::string name,          
+                           std::vector<PathLocation> &path); 
 
   static void getKTestFilesInDir(std::string directoryPath,
                                  std::vector<std::string> &results);
@@ -481,6 +487,30 @@ KleeHandler::openTestFile(const std::string &suffix, unsigned id) {
   return openOutputFile(getTestFilename(suffix, id));
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &o, const PathLocation &I) 
+{                                                                          
+  o << I.branch << " " << I.blockName.size() << " " << I.blockName ;       
+  return o;                                                                
+}                                                                          
+                                                                           
+std::istream &operator>>(std::istream &i, PathLocation &I)                 
+{                                                                          
+  unsigned int branch, count;                                              
+                                                                           
+  // >> to char is different -- use a temporary unsigned                   
+  i >> branch;                                                             
+  I.branch = branch;                                                       
+                                                                           
+  i >> count;                                                              
+  i.get();   // read extra whitespace                                      
+  char *buf = new char[count];                                             
+  i.read(buf, count);                                                      
+  I.blockName = std::string(buf, count);                                   
+  delete[] buf;                                                            
+                                                                           
+  return i;                                                                
+}                                                                          
+
 
 /* Outputs all files (.ktest, .kquery, .cov etc.) describing a test case */
 void KleeHandler::processTestCase(const ExecutionState &state,
@@ -533,7 +563,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     }
 
     if (m_pathWriter) {
-      std::vector<unsigned char> concreteBranches;
+      //std::vector<unsigned char> concreteBranches;
+      std::vector<PathLocation> concreteBranches;
       m_pathWriter->readStream(m_interpreter->getPathStreamID(state),
                                concreteBranches);
       auto f = openTestFile("path", id);
@@ -571,7 +602,8 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     }
 
     if (m_symPathWriter) {
-      std::vector<unsigned char> symbolicBranches;
+      //std::vector<unsigned char> symbolicBranches;
+      std::vector<PathLocation> symbolicBranches;
       m_symPathWriter->readStream(m_interpreter->getSymbolicPathStreamID(state),
                                   symbolicBranches);
       auto f = openTestFile("sym.path", id);
@@ -621,12 +653,31 @@ void KleeHandler::loadPathFile(std::string name,
     assert(0 && "unable to open path file");
 
   while (f.good()) {
-    unsigned value;
-    f >> value;
-    buffer.push_back(!!value);
+    PathLocation loc;              
+    f >> loc;                      
+    if (!f.good())                 
+            break;                 
+    buffer.push_back(!!loc.branch);
     f.get();
   }
 }
+
+void KleeHandler::loadPartialPathFile(std::string name,                
+                                     std::vector<PathLocation> &path) {
+  std::ifstream f(name.c_str(), std::ios::in | std::ios::binary);      
+                                                                       
+  if (!f.good())                                                       
+    assert(0 && "unable to open path file");                           
+                                                                       
+  while (f.good()) {                                                   
+    PathLocation loc;                                                  
+    f >> loc;                                                          
+    if (!f.good())                                                     
+            break;                                                     
+    path.push_back(loc);                                               
+    f.get();                                                           
+  }                                                                    
+}                                                                      
 
 void KleeHandler::getKTestFilesInDir(std::string directoryPath,
                                      std::vector<std::string> &results) {
@@ -1359,6 +1410,13 @@ int main(int argc, char **argv, char **envp) {
     KleeHandler::loadPathFile(ReplayPathFile, replayPath);
   }
 
+  std::vector<PathLocation> replayPartialPath;
+
+  if (ReplayPartialPathFile !=""){                                                                   
+    assert(ReplayPathFile == "" && "cannot Specify replay-path with replay-partial-path same time"); 
+    KleeHandler::loadPartialPathFile(ReplayPartialPathFile, replayPartialPath);                      
+  }                                                                                                  
+
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
@@ -1387,6 +1445,9 @@ int main(int argc, char **argv, char **envp) {
     interpreter->setReplayPath(&replayPath);
   }
 
+  if (ReplayPartialPathFile != "")                          
+    interpreter->setReplayPartialPath(&replayPartialPath);  
+                                                            
 
   auto startTime = std::time(nullptr);
   { // output clock info and start time

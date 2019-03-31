@@ -24,6 +24,18 @@
 using namespace klee;
 
 ///
+PathLocation::PathLocation(std::ifstream &is, size_t &size) { 
+  this->branch = is.get()=='1' ? true :false;                 
+                                                              
+  unsigned bsize;                                             
+  is.read(reinterpret_cast<char*>(&bsize), 4);                
+  char *bname = new char[bsize];                              
+  is.read(bname, bsize);                                      
+  this->blockName = std::string(bname, bsize);                
+  delete[] bname;                                             
+                                                              
+  size = 1 + 4 + bsize;                                       
+}                                                             
 
 TreeStreamWriter::TreeStreamWriter(const std::string &_path) 
   : lastID(0),
@@ -94,7 +106,7 @@ void TreeStreamWriter::flush() {
 }
 
 void TreeStreamWriter::readStream(TreeStreamID streamID,
-                                  std::vector<unsigned char> &out) {
+                                  std::vector<PathLocation> &out) { //std::vector<unsigned char> &out) {
   assert(streamID>0 && streamID<ids);
   flush();
   
@@ -152,7 +164,12 @@ void TreeStreamWriter::readStream(TreeStreamID streamID,
     } else {
       unsigned size = tag;
       if (id==roots.back()) {
-        while (size--) out.push_back(is.get());
+        //while (size--) out.push_back(is.get());
+        while (size) {                         
+          size_t sz;                           
+          out.push_back(PathLocation(is, sz)); 
+          size -= sz;                          
+        }
       } else {
         while (size--) is.get();
       }

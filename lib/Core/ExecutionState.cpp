@@ -76,6 +76,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
     coveredNew(false),
     forkDisabled(false),
     ptreeNode(0),
+    partialPathPosition(0),
     steppedInstructions(0){
   pushFrame(0, kf);
 }
@@ -117,6 +118,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
 
     pathOS(state.pathOS),
     symPathOS(state.symPathOS),
+    partialPathPosition(state.partialPathPosition),
 
     instsSinceCovNew(state.instsSinceCovNew),
     coveredNew(state.coveredNew),

@@ -14,7 +14,7 @@
 #include <set>
 #include <string>
 #include <vector>
-
+#include "klee/Internal/ADT/TreeStream.h"
 struct KTest;
 
 namespace llvm {
@@ -124,7 +124,9 @@ public:
   // take on forks. this can be used to drive the interpretation down
   // a user specified path. use null to reset.
   virtual void setReplayPath(const std::vector<bool> *path) = 0;
-
+ 
+  virtual void setReplayPartialPath(const std::vector<PathLocation> *path) = 0;
+ 
   // supply a set of symbolic bindings that will be used as "seeds"
   // for the search. use null to reset.
   virtual void useSeeds(const std::vector<struct KTest *> *seeds) = 0;
