@@ -890,43 +890,37 @@ void Executor::branch(ExecutionState &state,
       addConstraint(*result[i], conditions[i]);
 }
 
-std::string Executor::getPathInfo(const ExecutionState &state, bool trueBranch)                          
-{                                                                                                        
-  const llvm::BranchInst *branch =                                                                       
-          dyn_cast<llvm::BranchInst>(state.prevPC->inst);                                                
-  const llvm::BasicBlock *block = branch->getParent();                                                   
-  const llvm::Function *function = block->getParent();                                                   
-  //const llvm::Module *module = branch->getModule();                                                    
-                                                                                                         
-  const std::string fname = function->getName().str();                                                   
-  std::string blockname ="";                                                                             
-  if(fname[0]=='_' && fname[1]=='0'){                                                                    
-    std::string t;                                                                                       
-    llvm::raw_string_ostream yy(t);                                                                      
-    block->printAsOperand(yy, false);                                                                    
-    blockname = fname + yy.str();                                                                        
-  }                                                                                                      
-  //const std::string &functionname = function->getName().str();                                         
-  //const std::string &moduleID = module->getModuleIdentifier();                                         
-  unsigned int bsize = blockname.size();                                                                 
-  //unsigned int fsize = functionname.size();                                                            
-  //unsigned int msize = moduleID.size();                                                                
-                                                                                                         
-  std::stringstream ss;                                                                                  
-                                                                                                         
-  ss << (trueBranch ? '1' : '0');                                                                        
-                                                                                                         
-  ss.write(reinterpret_cast<char*>(&bsize), sizeof(unsigned int));   // control the alloc size for string
-  ss << blockname ;                                                                                      
-                                                                                                         
-  //ss.write(reinterpret_cast<char*>(&fsize), sizeof(unsigned int));                                     
-  //ss << functionname ;                                                                                 
-                                                                                                         
-  //ss.write(reinterpret_cast<char*>(&msize), sizeof(unsigned int));                                     
-  //ss << moduleID ;                                                                                     
-                                                                                                         
-  return ss.str();                                                                                       
-}                                                                                                        
+std::string Executor::getPathInfo(const ExecutionState &state, bool trueBranch)
+{
+  const llvm::BranchInst *branch =
+          dyn_cast<llvm::BranchInst>(state.prevPC->inst);
+  const llvm::BasicBlock *block = branch->getParent();
+  //const llvm::Function *function = block->getParent();
+  //const llvm::Module *module = branch->getModule();
+
+
+  const std::string &blockname = block->getName().str();
+  //const std::string &functionname = function->getName().str();
+  //const std::string &moduleID = module->getModuleIdentifier();
+  unsigned int bsize = blockname.size();
+  //unsigned int fsize = functionname.size();
+  //unsigned int msize = moduleID.size();
+
+  std::stringstream ss;
+
+  ss << (trueBranch ? '1' : '0');
+  
+  ss.write(reinterpret_cast<char*>(&bsize), sizeof(unsigned int));   // control the alloc size for string 
+  ss << blockname ;
+
+  //ss.write(reinterpret_cast<char*>(&fsize), sizeof(unsigned int));
+  //ss << functionname ;
+
+  //ss.write(reinterpret_cast<char*>(&msize), sizeof(unsigned int));
+  //ss << moduleID ;
+
+  return ss.str();
+}                                                                                                     
 
 Executor::StatePair 
 Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
@@ -994,52 +988,46 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
           addConstraint(current, Expr::createIsZero(condition));
         }
       }
-    } else if (replayPartialPath && !isInternal && current.partialPathPosition < replayPartialPath->size() ){                                          
-      /// partial path condition                                                                                                                       
-      /// define for partial path condition                                                                                                            
-      const llvm::BranchInst *branch = dyn_cast<llvm::BranchInst>(current.prevPC->inst);                                                               
-      const llvm::BasicBlock *block = branch->getParent();                                                                                             
-      const std::string fname = block->getParent()->getName().str();                                                                                   
-      // define end                                                                                                                                    
-                                                                                                                                                       
-      // define user function with '_0' prefix                                                                                                         
-      if ( fname[0]=='_' && fname[1]=='0'){                                                                                                            
-        std::string t;                                                                                                                                 
-        llvm::raw_string_ostream yy(t);                                                                                                                
-        block->printAsOperand(yy, false); // get block identifier                                                                                      
-        const std::string &blockname = fname+yy.str();                                                                                                 
-                                                                                                                                                       
-        // choose the right block                                                                                                                      
-        if (blockname == (*replayPartialPath)[current.partialPathPosition].blockName ){                                                                
-          bool branch = (*replayPartialPath)[current.partialPathPosition].branch;                                                                      
-          // enable for debug                                                                                                                          
-          // llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";
-          // progress tips
-          // llvm::outs() << "\tnum:"<< current.partialPathPosition << "\tprocess: "<< current.partialPathPosition*100 /(replayPartialPath->size()-1) <<"%\n";
-                                                                                                                                                       
-          if (res==Solver::True) {                                                                                                                     
-            if (!branch){
-              terminateState(current); // terminated without testcase generated
-              return StatePair(0, 0);                                                                                                                  
-            }                                                                                                                                          
-          } else if (res==Solver::False) {                                                                                                             
-            if (branch){                                                                                                                               
-              terminateState(current);                                                                  
-              return StatePair(0, 0);                                                                                                                  
-            }                                                                                                                                          
-          } else {                                                                                                                                     
-            // add constraints                                                                                                                         
-            if(branch) {                                                                                                                               
-              res = Solver::True;                                                                                                                      
-              addConstraint(current, condition);                                                                                                       
-            } else  {                                                                                                                                  
-              res = Solver::False;                                                                                                                     
-              addConstraint(current, Expr::createIsZero(condition));                                                                                   
-            }                                                                                                                                          
-          }                                                                                                                                            
-          current.partialPathPosition++;                                                                                                               
-        }                                                                                                                                              
-      }                                                                                                                                                
+    } else if (replayPartialPath && !isInternal && current.partialPathPosition < replayPartialPath->size() ){
+      /// partial path condition
+      /// define for partial path condition
+      const llvm::BranchInst *branch = dyn_cast<llvm::BranchInst>(current.prevPC->inst);
+      const llvm::BasicBlock *block = branch->getParent()
+      // define end
+
+      const std::string &blockname = block->getName().str();
+
+      // choose the right block
+      if (blockname == (*replayPartialPath)[current.partialPathPosition].blockName ){
+        bool branch = (*replayPartialPath)[current.partialPathPosition].branch;
+        // enable for debug
+        // llvm::outs() << "\nBlock Name:\t" << blockname << "\tBranch:\t"  << branch << "\tnum:"<< current.partialPathPosition <<"\n";
+        // progress tips
+        // llvm::outs() << "\tnum:"<< current.partialPathPosition << "\tprocess: "<< current.partialPathPosition*100 /(replayPartialPath->size()-1) <<"%\n";
+
+        if (res==Solver::True) {
+          if (!branch){
+            terminateState(current); // terminated without testcase generated
+            return StatePair(0, 0);
+          }
+        } else if (res==Solver::False) {
+          if (branch){
+            terminateState(current);
+            return StatePair(0, 0);
+          }
+        } else {
+          // add constraints
+          if(branch) {
+            res = Solver::True;
+            addConstraint(current, condition);
+          } else  {
+            res = Solver::False;
+            addConstraint(current, Expr::createIsZero(condition));
+          }
+        }
+        current.partialPathPosition++;
+      }
+      
 
     } else if (res==Solver::Unknown) {
       assert(!replayKTest && "in replay mode, only one branch can be true.");
